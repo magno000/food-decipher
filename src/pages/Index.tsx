@@ -51,10 +51,21 @@ const Index = () => {
     setLoading(true);
     setResult(null);
 
-    // TODO: Reemplazar este mock por la llamada real al backend (OpenAI + Backend tool)
-    setTimeout(() => {
+    try {
+      // Llamada real al backend (Supabase Edge Function + OpenAI Vision)
+      const analyzed = await (await import("@/lib/api")).analyzeImageWithAI(file);
+
+      // Completar datos derivados
+      const gl = computeGL(analyzed.nutrition.glycemicIndex, analyzed.nutrition.carbs);
+      analyzed.nutrition.glycemicLoad = gl;
+      analyzed.nutrition.diabeticFriendly = isDiabeticFriendly(analyzed.nutrition);
+
+      setResult(analyzed);
+      toast({ title: "Análisis completado", description: "Se generó el análisis nutricional mediante IA." });
+    } catch (err) {
+      // Fallback: mantener la app funcional con un mock
       const mock: AnalysisResult = {
-        name: "Ensalada de pollo",
+        name: "Plato identificado",
         totalWeightGrams: 350,
         imageUrl: preview || undefined,
         nutrition: {
@@ -80,9 +91,11 @@ const Index = () => {
       mock.nutrition.glycemicLoad = gl;
       mock.nutrition.diabeticFriendly = isDiabeticFriendly(mock.nutrition);
       setResult(mock);
+      toast({ title: "Servicio no disponible", description: "Usamos datos de ejemplo por ahora.", variant: "destructive" });
+    } finally {
       setLoading(false);
-      toast({ title: "Análisis completado", description: "Se generó el análisis nutricional estimado." });
-    }, 1000);
+    }
+
   };
 
   return (
