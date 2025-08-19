@@ -62,32 +62,56 @@ Devuelve únicamente un objeto JSON VÁLIDO con este formato y números en unida
 
     const userPrompt = `Analiza la imagen del plato y estima los campos solicitados. Si el plato parece un estofado de carne con verduras u otros guisos, identifícalo correctamente (evita clasificarlo como ensalada si no lo es).`;
 
-    // Use OpenAI Chat Completions with vision-capable model
-    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        response_format: { type: "json_object" },
-        temperature: 0.2,
-        messages: [
-          { role: "system", content: systemPrompt },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: userPrompt },
-              { type: "image_url", image_url: { url: image } },
-            ],
-          },
+    // Build two candidate message formats and try both if needed
+    const messagesImageUrl = [
+      { role: "system", content: systemPrompt },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: userPrompt },
+          { type: "image_url", image_url: { url: image } },
         ],
-      }),
-    });
+      },
+    ];
+
+    const messagesInputImage = [
+      { role: "system", content: systemPrompt },
+      {
+        role: "user",
+        content: [
+          { type: "input_text", text: userPrompt },
+          { type: "input_image", image_url: image },
+        ],
+      },
+    ];
+
+    async function callOpenAI(messages: unknown) {
+      return await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          response_format: { type: "json_object" },
+          max_tokens: 500,
+          temperature: 0.2,
+          messages,
+        }),
+      });
+    }
+
+    let resp = await callOpenAI(messagesImageUrl);
+    if (!resp.ok && resp.status >= 400 && resp.status < 500) {
+      const text = await resp.text();
+      console.warn("[analyze-image] First format failed, retrying with input_image", { status: resp.status, detail: text });
+      resp = await callOpenAI(messagesInputImage);
+    }
 
     if (!resp.ok) {
       const text = await resp.text();
+      console.error("[analyze-image] OpenAI error", { status: resp.status, detail: text });
       return new Response(JSON.stringify({ error: "OpenAI error", detail: text }), {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -133,6 +157,7 @@ Devuelve únicamente un objeto JSON VÁLIDO con este formato y números en unida
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   } catch (err) {
+    console.error("[analyze-image] Unhandled error", err);
     return new Response(JSON.stringify({ error: "Unhandled error", detail: String(err) }), {
       status: 500,
       headers: { "Content-Type": "application/json", ...corsHeaders },

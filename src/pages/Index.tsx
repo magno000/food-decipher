@@ -62,36 +62,10 @@ const Index = () => {
 
       setResult(analyzed);
       toast({ title: "Análisis completado", description: "Se generó el análisis nutricional mediante IA." });
-    } catch (err) {
-      // Fallback: mantener la app funcional con un mock
-      const mock: AnalysisResult = {
-        name: "Plato identificado",
-        totalWeightGrams: 350,
-        imageUrl: preview || undefined,
-        nutrition: {
-          calories: 520,
-          protein: 38,
-          fat: 22,
-          carbs: 40,
-          fiber: 9,
-          sugars: 8,
-          addedSugars: 2,
-          sodium: 620,
-          glycemicIndex: 48,
-          score: 82,
-        },
-        recommendations: [
-          "Añade frutos secos para aumentar grasas saludables y saciedad.",
-          "Evita aderezos con azúcares añadidos; prefiere aceite de oliva.",
-          "Incluye pan integral si necesitas más carbohidratos de baja carga.",
-        ],
-        detailsText: "Valores estimados automáticamente. Ajusta porciones para tus necesidades.",
-      };
-      const gl = computeGL(mock.nutrition.glycemicIndex, mock.nutrition.carbs);
-      mock.nutrition.glycemicLoad = gl;
-      mock.nutrition.diabeticFriendly = isDiabeticFriendly(mock.nutrition);
-      setResult(mock);
-      toast({ title: "Servicio no disponible", description: "Usamos datos de ejemplo por ahora.", variant: "destructive" });
+    } catch (err: any) {
+      const message = err?.message || "No se pudo analizar la imagen.";
+      toast({ title: "Error al analizar", description: message, variant: "destructive" });
+      setResult(null);
     } finally {
       setLoading(false);
     }
