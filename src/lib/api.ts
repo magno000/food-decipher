@@ -1,4 +1,5 @@
 import { AnalysisResult } from "@/types/nutrition";
+import { supabase } from "@/integrations/supabase/client";
 
 async function fileToDataUrl(file: File): Promise<string> {
   const dataUrl: string = await new Promise((resolve, reject) => {
@@ -13,16 +14,13 @@ async function fileToDataUrl(file: File): Promise<string> {
 export async function analyzeImageWithAI(file: File): Promise<AnalysisResult> {
   const imageDataUrl = await fileToDataUrl(file);
 
-  const res = await fetch("/functions/v1/analyze-image", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ image: imageDataUrl }),
+  const { data, error } = await supabase.functions.invoke("analyze-image", {
+    body: { image: imageDataUrl },
   });
 
-  if (!res.ok) {
-    throw new Error(`Edge function error: ${res.status}`);
+  if (error) {
+    throw new Error(`Edge function error: ${error.message ?? "unknown"}`);
   }
 
-  const data = (await res.json()) as AnalysisResult;
-  return data;
+  return data as AnalysisResult;
 }

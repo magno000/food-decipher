@@ -1,1 +1,5 @@
 project_id = "lywpgfnjliwmvpcklibz"
+
+[functions]
+  [functions.analyze-image]
+  verify_jwt = false
