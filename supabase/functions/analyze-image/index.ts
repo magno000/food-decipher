@@ -79,7 +79,7 @@ Devuelve únicamente un objeto JSON VÁLIDO con este formato y números en unida
             role: "user",
             content: [
               { type: "text", text: userPrompt },
-              { type: "input_image", image_url: image },
+              { type: "image_url", image_url: { url: image } },
             ],
           },
         ],
