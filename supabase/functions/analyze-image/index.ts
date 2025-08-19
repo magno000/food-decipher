@@ -1,5 +1,6 @@
 // Supabase Edge Function: analyze-image
 // Deno runtime
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
 const corsHeaders = {
@@ -21,16 +22,38 @@ serve(async (req: Request) => {
       });
     }
 
-    const apiKey = Deno.env.get("OPENAI_API_KEY");
-    if (!apiKey) {
-      return new Response(JSON.stringify({ error: "Missing OPENAI_API_KEY" }), {
-        status: 500,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      });
-    }
-
     const body = await req.json();
     const image: string | undefined = body?.image; // data URL or remote URL
+
+    const apiKey = Deno.env.get("OPENAI_API_KEY");
+    if (!apiKey) {
+      console.warn("[analyze-image] Missing OPENAI_API_KEY, returning fallback data");
+      const fallback = {
+        name: "Plato (ejemplo)",
+        totalWeightGrams: 350,
+        imageUrl: image ?? null,
+        nutrition: {
+          calories: 520,
+          protein: 28,
+          fat: 18,
+          carbs: 55,
+          fiber: 7,
+          sugars: 9,
+          addedSugars: 0,
+          sodium: 680,
+          glycemicIndex: 54,
+          score: 72
+        },
+        recommendations: [
+          "Añade verduras de hoja para más fibra",
+          "Reduce sal y salsas altas en sodio",
+          "Prefiere cereales integrales para bajar el índice glucémico"
+        ],
+        detailsText: "Resultado de ejemplo por falta de clave de IA."
+      };
+      return new Response(JSON.stringify(fallback), { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } });
+    }
+
     if (!image) {
       return new Response(JSON.stringify({ error: "Missing image in request body" }), {
         status: 400,
@@ -74,16 +97,6 @@ Devuelve únicamente un objeto JSON VÁLIDO con este formato y números en unida
       },
     ];
 
-    const messagesInputImage = [
-      { role: "system", content: systemPrompt },
-      {
-        role: "user",
-        content: [
-          { type: "input_text", text: userPrompt },
-          { type: "input_image", image_url: image },
-        ],
-      },
-    ];
 
     async function callOpenAI(messages: unknown) {
       return await fetch("https://api.openai.com/v1/chat/completions", {
@@ -103,17 +116,35 @@ Devuelve únicamente un objeto JSON VÁLIDO con este formato y números en unida
     }
 
     let resp = await callOpenAI(messagesImageUrl);
-    if (!resp.ok && resp.status >= 400 && resp.status < 500) {
-      const text = await resp.text();
-      console.warn("[analyze-image] First format failed, retrying with input_image", { status: resp.status, detail: text });
-      resp = await callOpenAI(messagesInputImage);
-    }
 
     if (!resp.ok) {
       const text = await resp.text();
       console.error("[analyze-image] OpenAI error", { status: resp.status, detail: text });
-      return new Response(JSON.stringify({ error: "OpenAI error", detail: text }), {
-        status: 500,
+      const fallback = {
+        name: "Plato (ejemplo)",
+        totalWeightGrams: 350,
+        imageUrl: image,
+        nutrition: {
+          calories: 520,
+          protein: 28,
+          fat: 18,
+          carbs: 55,
+          fiber: 7,
+          sugars: 9,
+          addedSugars: 0,
+          sodium: 680,
+          glycemicIndex: 54,
+          score: 72,
+        },
+        recommendations: [
+          "Añade verduras de hoja para más fibra",
+          "Reduce sal y salsas altas en sodio",
+          "Prefiere cereales integrales para bajar el índice glucémico",
+        ],
+        detailsText: "Resultado de ejemplo por indisponibilidad de IA.",
+      };
+      return new Response(JSON.stringify(fallback), {
+        status: 200,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
